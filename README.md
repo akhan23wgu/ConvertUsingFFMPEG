@@ -1,4 +1,4 @@
-# ConvertUsingFFMPEG
+# ConvertUsingFFMPEG with NVENC Encoding
 Powershell Script to automate conversion of video files a specified size or larger to smaller mkv or mp4 files.
 
 # Pre Reqs
@@ -44,8 +44,9 @@ for more information on Execution Policy view this page: <https://technet.micros
 
 # Other Information
 
-1. This takes a LONG time to run it all depends on how fast your computer is and how the original file was encoded
-2. On average a 2GB file will take 2-3 hours to complete on an 8 core CPU clocked around 3.9GHz (Might be faster or slower depending on how new the CPU is)
+1. Average to convert a 5GB file is 30 minutes
+2. On average a 2GB file will take 20 minutes on a 1050Ti (Might be faster or slower depending on how new the GPU is)
+3. NVENC encoding ONLY works on 9xx+ GPUs
 
 # License
 
