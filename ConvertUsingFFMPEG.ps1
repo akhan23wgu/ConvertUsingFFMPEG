@@ -4,13 +4,14 @@
 ### Specify Directories below ###
 
 # TV Shows directory
-$TvShowDir = "C:\Path\To\Episodes"
+$TvShowDir = "M:\TV"
 
 # Movies directory
-$MovieDir = "\\File.Server\Path\To\Movies"
+$MovieDir = "M:\Movies"
 
-# HandBreakCLI Directory (Wherever you extracted Handbreak to.  Example: C:\Downloads\HandBrakeCLI-1.0.3-win-x86_64
-$HandBreakDir = "C:\Downloads\HandBrakeCLI-1.0.3-win-x86_64"
+# ffmpeg Directory (Wherever you extracted ffmpeg to.  Example: C:\Downloads\ffmpeg
+$ffmpegDir = "D:\Documents\ffmpeg\bin"
+
 
 ##### Changes Below here are optional #####
 
@@ -28,10 +29,10 @@ $MovieSize = 2GB
 ### Change file format to desired format, defaults to .mkv"
 
 #File format must be either mkv or mp4
-$FileFormat = "mkv"
+$FileFormat = "mp4"
 
 
-##### These can be changed but will default to the extracted folder and the 64bit install of handbreak #####
+##### These can be changed but will default to the extracted folder and the 64bit install of ffmpeg #####
 
 # Create Variable for storing the current directory
 if (!$WorkingDir){
@@ -78,9 +79,9 @@ if(-not(Test-Path($LogFileDir))){
     $LogFileDir = Resolve-Path -Path $LogFileDir
 }
 
-# Check to see if HandbreakCLI.exe exists in $HandbreakDir
-if(-not(Test-Path("$HandBreakDir\HandBrakeCLI.exe"))){
-    Write-Host "HandBrakeCLI.exe not found in $HandBreakDir Please make sure that HandBreak is installed.  Quitting" -ForegroundColor Red
+# Check to see if ffmpeg.exe exists in $ffmpegDir
+if(-not(Test-Path("$ffmpegDir\ffmpeg.exe"))){
+    Write-Host "ffmpeg.exe not found in $HandBreakDir Please make sure that HandBreak is installed.  Quitting" -ForegroundColor Red
     Read-Host "Press Enter to exit..."
     exit
 }
@@ -110,11 +111,11 @@ foreach($file in $CompletedTable){
 #####  Start looking for files and converting files happens after here #####
 
 # Output that we are finding file
-Write-Host "Finding Movie files over $($MovieSize/1GB)GB in $MovieDir and Episodes over $($TvShowSize/1GB)GB in $TvShowDir be patient..." -ForegroundColor Gray
+Write-Host "Finding Movie files over $($MovieSize/1GB)GB in $MovieDir and Episodes over $($TvShowSize/1GB)GB in $TvShowDir in the last 24 hours..." -ForegroundColor Gray
 
 # Find all files larger than 2GB
-$LargeTvFiles = Get-ChildItem $TvShowDir -recurse | where-object {$_.length -gt $TvShowSize}  | Select-Object FullName,Directory,BaseName,Length
-$LargeMovieFiles = Get-ChildItem $MovieDir -recurse | where-object {$_.length -gt $MovieSize}  | Select-Object FullName,Directory,BaseName,Length
+$LargeTvFiles = Get-ChildItem $TVShowDir -recurse | where-object {(($_.length -gt $TVShowSize) -and ($_.CreationTime -gt (Get-Date).AddDays(-1)))} | Select-Object FullName,Directory,BaseName,Length
+$LargeMovieFiles = Get-ChildItem $MovieDir -recurse | where-object {(($_.length -gt $MovieSize) -and ($_.CreationTime -gt (Get-Date).AddDays(-1)))} | Select-Object FullName,Directory,BaseName,Length
 
 # Merge the files from both locations into one array and sort largest to smallest (So we start by converting the largest file first)
 $AllLargeFiles = $LargeTvFiles
@@ -142,15 +143,21 @@ foreach($File in $AllLargeFiles){
         # Change the CPU priorety of HandBreakCLI.exe to below Normal in 10 seconds so that the conversion has started
         Start-Job -ScriptBlock {
             Start-Sleep -s 10
-            $p = Get-Process -Name HandBrakeCLI
+            $p = Get-Process -Name ffmpeg
             $p.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::BelowNormal
         } 
         # Write that we are starting the conversion
         $StartingFileSize = $File.Length/1GB
         Write-Host "Starting conversion on $InputFile it is $([math]::Round($StartingFileSize,2))GB in size before conversion" -ForegroundColor Cyan
-        # Start the Conversion (The switches used are based off of YIFY's settings and depending on the file can compress by 80% or more (The larger the starting file the more we should be able to shrink it)
-        & $HandBreakDir\HandBrakeCLI.exe -i "$InputFile" -t 1 --angle 1 -o "$OutputFile" -f $FileFormat --modulus 2 -e x265 -q 23 --cfr -a 1 -E copy:* -6 dpl2 -R 48 -B 64 -D 0 --gain 0 --audio-fallback ac3 -m --encoder-preset=veryfast --verbose=1 2> "$LogFileDir\$LogEpisodeName.txt"
-        # Check to make sure that the output file actuall exists so that if there was a conversion error we don't delete the original
+        # I messed with the settings until I found it acceptable. Obviously quality won't be as good as source, but the file size is much much smaller. (example: 2.6GB file went down to 600MB.)
+		#https://www.reddit.com/r/PleX/comments/56v7s1/hevc_encoding_1080p_using_nvenc_for_devices_that/
+		###NVENC_HighQuality_HelpsWithMotion_PlusColorConversion### *Requires 10xx GPU
+		#& $ffmpegDir\ffmpeg.exe -i "$InputFile" -c:v hevc_nvenc -pix_fmt yuv444p16 -profile:v main10 -preset slow -rc vbr_2pass -qmin 15 -qmax 20 -2pass 1 -rc-lookahead 32 -c:a:0 copy "$OutputFile" 2> "$LogFileDir\$LogEpisodeName.txt"
+		###NVENC_HighQuality_Standard### *Requires nVidia 10xx GPU - I used a 1050Ti, average 190fps
+		& $ffmpegDir\ffmpeg.exe -i "$InputFile" -c:v nvenc_hevc -b:v 2000k -minrate 800k -profile:v main10 -preset llhq -rc vbr_2pass -qmin 25 -qmax 35 -rc-lookahead 32 -c:a:0  copy "$OutputFile" 2> "$LogFileDir\$LogEpisodeName.txt"
+
+
+        # Check to make sure that the output file actually exists so that if there was a conversion error we don't delete the original
         if( Test-Path $OutputFile ){
             Remove-Item $InputFile -Force
             Rename-Item $OutputFile $FinalName
@@ -180,4 +187,5 @@ foreach($File in $AllLargeFiles){
     }
     # Cleanup our variables so there is nothing leftover for the next run
     Clear-Variable InputFile,OutputFile,EpisodeName,FinalName,AllLargeFiles,TvShowDir,MovieDir,LargeMovieFiles,LargeTvFiles,File,EndingFile,EndingFileSize,TvShowSize,MovieSize -ErrorAction SilentlyContinue
+
 }
