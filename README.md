@@ -1,8 +1,8 @@
-# ConvertUsingHandBreakCLI
+# ConvertUsingFFMPEG
 Powershell Script to automate conversion of video files a specified size or larger to smaller mkv or mp4 files.
 
 # Pre Reqs
-1. Must have HandBreakCLI (64-bit) installed.  You can get it here: <https://handbrake.fr/downloads2.php>
+1. Must have ffmpeg installed.  You can get it here: <https://www.ffmpeg.org/>
 2. Must have powershell setup to allow this script.  See [Powershell Setup](https://github.com/Rocketcandy/ConvertUsingHandBreakCLI#powershell-setup)
 3. Powershell is a requirement to run the script.  I have only tested it on Windows, but if you can get it to work on MacOS or Linux more power to you!
 4. Edit the script and change the first section of the script to match your needs
